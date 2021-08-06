@@ -14,10 +14,10 @@ def initial_checks(template=None, facemask=None):
     """Initial sanity checks."""
     if template is None:
         template = resource_filename(Requirement.parse("pydeface"),
-                                     "pydeface/data/mean_reg2mean.nii.gz")
+                                     "pydeface/data/mni_icbm152_t1_tal_nlin_asym_09a.nii.gz")
     if facemask is None:
         facemask = resource_filename(Requirement.parse("pydeface"),
-                                     "pydeface/data/facemask.nii.gz")
+                                     "pydeface/data/mni_icbm152_t1_tal_nlin_asym_09a_face_mask_filled_resampled_resized.nii.gz")
 
     if not os.path.exists(template):
         raise Exception('Missing template: %s' % template)
@@ -55,7 +55,9 @@ def generate_tmpfiles(verbose=True):
         print("Temporary files:\n  %s\n  %s" % (template_reg_mat, warped_mask))
     _, template_reg = tempfile.mkstemp(suffix='.nii.gz')
     _, warped_mask_mat = tempfile.mkstemp(suffix='.mat')
-    return template_reg, template_reg_mat, warped_mask, warped_mask_mat
+    _, resize_mat = tempfile.mkstemp(suffix='.mat')
+    _, combined_mat = tempfile.mkstemp(suffix='.mat')
+    return template_reg, template_reg_mat, warped_mask, warped_mask_mat, resize_mat, combined_mat
 
 
 def cleanup_files(*args):
@@ -85,13 +87,14 @@ def deface_image(infile=None, outfile=None, facemask=None,
 
     template, facemask = initial_checks(template, facemask)
     outfile = output_checks(infile, outfile, force)
-    template_reg, template_reg_mat, warped_mask, warped_mask_mat = generate_tmpfiles()
+    template_reg, template_reg_mat, warped_mask, warped_mask_mat, resize_mat, combined_mat = generate_tmpfiles()
 
     print('Defacing...\n  %s' % infile)
     # register template to infile
     outfile_type = get_outfile_type(template_reg)
     flirt = fsl.FLIRT()
     flirt.inputs.cost_func = cost
+    flirt.inputs.dof = 12
     flirt.inputs.in_file = template
     flirt.inputs.out_matrix_file = template_reg_mat
     flirt.inputs.out_file = template_reg
@@ -99,11 +102,30 @@ def deface_image(infile=None, outfile=None, facemask=None,
     flirt.inputs.reference = infile
     flirt.run()
 
+
+    # find resize transformation between template and facemask
+    flirt = fsl.FLIRT()
+    flirt.inputs.in_file = facemask
+    flirt.inputs.apply_xfm = True
+    flirt.inputs.uses_qform = True
+    flirt.inputs.no_search = True
+    flirt.inputs.reference = template
+    flirt.inputs.out_matrix_file = resize_mat
+    flirt.run()
+
+    # combine mats
+    convert_xfm = fsl.ConvertXFM()
+    convert_xfm.inputs.in_file = resize_mat
+    convert_xfm.inputs.concat_xfm =True
+    convert_xfm.inputs.in_file2 = template_reg_mat
+    convert_xfm.inputs.out_file = combined_mat
+    convert_xfm.run()
+
     outfile_type = get_outfile_type(warped_mask)
     # warp facemask to infile
     flirt = fsl.FLIRT()
     flirt.inputs.in_file = facemask
-    flirt.inputs.in_matrix_file = template_reg_mat
+    flirt.inputs.in_matrix_file = combined_mat
     flirt.inputs.apply_xfm = True
     flirt.inputs.reference = infile
     flirt.inputs.out_file = warped_mask
@@ -114,10 +136,14 @@ def deface_image(infile=None, outfile=None, facemask=None,
     # multiply mask by infile and save
     infile_img = load(infile)
     warped_mask_img = load(warped_mask)
+
+    #invert mask
+    warped_mask_img_data = -(warped_mask_img.get_data()-1)
+
     try:
-        outdata = infile_img.get_data().squeeze() * warped_mask_img.get_data()
+        outdata = infile_img.get_data().squeeze() * warped_mask_img_data
     except ValueError:
-        tmpdata = np.stack([warped_mask_img.get_data()] *
+        tmpdata = np.stack([warped_mask_img_data] *
                            infile_img.get_data().shape[-1], axis=-1)
         outdata = infile_img.get_data() * tmpdata
 
@@ -125,7 +151,6 @@ def deface_image(infile=None, outfile=None, facemask=None,
                                infile_img.get_header())
     masked_brain.to_filename(outfile)
     print("Defaced image saved as:\n  %s" % outfile)
-
     if forcecleanup:
         cleanup_files(warped_mask, template_reg, template_reg_mat)
         return warped_mask_img
