@@ -28,8 +28,8 @@ with open(os.path.join(this_directory, 'README.md'), encoding='utf-8') as f:
 if os.path.exists('MANIFEST'):
     os.remove('MANIFEST')
 
-datafiles = {'pydeface': ['data/facemask.nii.gz',
-                          'data/mean_reg2mean.nii.gz']}
+datafiles = {'pydeface': ['data/mni_icbm152_t1_tal_nlin_asym_09a.nii.gz',
+                          'data/mni_icbm152_t1_tal_nlin_asym_09a_face_mask_filled_resampled_resized.nii.gz']}
 
 setup(name='pydeface',
       maintainer='Russ Poldrack',
