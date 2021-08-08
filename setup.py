@@ -40,7 +40,7 @@ setup(name='pydeface',
       license='MIT',
       version=VERSION,
       url='http://poldracklab.org',
-      download_url=('https://github.com/1-w/pydeface/archive/'
+      download_url=('https://github.com/1-w/pydeface/archive/v'
                     + VERSION + '.tar.gz'),
       packages=['pydeface'],
       package_data=datafiles,
