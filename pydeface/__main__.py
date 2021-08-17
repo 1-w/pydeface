@@ -108,28 +108,30 @@ def main():
 
     # apply mask to other given images
     if args.applyto is not None:
-        print("Defacing mask also applied to:")
-        for applyfile in args.applyto:
-            applyfile_img = load(applyfile)
-            try:
-                outdata = applyfile_img.get_data() * warped_mask_img.get_data()
-            except ValueError:
-                tmpdata = np.stack([warped_mask_img.get_data()] *
-                           applyfile_img.get_data().shape[-1], axis=-1)
-                outdata = applyfile_img.get_data() * tmpdata
-            applyfile_img = Nifti1Image(outdata, applyfile_img.get_affine(),
-                                        applyfile_img.get_header())
-            outfile = pdu.output_checks(applyfile, force=args.force)
-            applyfile_img.to_filename(outfile)
-            print('  %s' % applyfile)
+         print("Defacing mask also applied to: ----- CURRENTLY NOT SUPPORTED")
+    #     for applyfile in args.applyto:
+    #         applyfile_img = load(applyfile)
+    #         try:
+    #             outdata = applyfile_img.get_data() * warped_mask_img.get_data()
+    #         except ValueError:
+    #             tmpdata = np.stack([warped_mask_img.get_data()] *
+    #                        applyfile_img.get_data().shape[-1], axis=-1)
+    #             outdata = applyfile_img.get_data() * tmpdata
+    #         applyfile_img = Nifti1Image(outdata, applyfile_img.get_affine(),
+    #                                     applyfile_img.get_header())
+    #         outfile = pdu.output_checks(applyfile, force=args.force)
+    #         applyfile_img.to_filename(outfile)
+    #         print('  %s' % applyfile)
 
-    if not args.nocleanup:
-        pdu.cleanup_files(warped_mask, template_reg, template_reg_mat)
-    else:
-        unclean_mask = args.infile.replace('.gz', '').replace('.nii','_pydeface_mask.nii.gz')
-        unclean_mat = args.infile.replace('.gz','').replace('.nii','_pydeface.mat')
-        shutil.move(warped_mask, unclean_mask)
-        shutil.move(template_reg_mat, unclean_mat)
+    # move unto deface workflow !
+
+    # if not args.nocleanup:
+    #     pdu.cleanup_files(warped_mask, template_reg, template_reg_mat)
+    # else:
+    #     unclean_mask = args.infile.replace('.gz', '').replace('.nii','_pydeface_mask.nii.gz')
+    #     unclean_mat = args.infile.replace('.gz','').replace('.nii','_pydeface.mat')
+    #     shutil.move(warped_mask, unclean_mask)
+    #     shutil.move(template_reg_mat, unclean_mat)
 
     print('Finished.')
 

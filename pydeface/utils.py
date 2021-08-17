@@ -5,9 +5,7 @@ import shutil
 import sys
 from pkg_resources import resource_filename, Requirement
 import tempfile
-import numpy as np
 import nipype.interfaces.fsl as fsl
-from nibabel import load, Nifti1Image
 from pathlib import Path
 
 from nipype import Workflow, Node, MapNode
@@ -51,16 +49,16 @@ def output_checks(infile, outfile=None, force=False):
         pass
     return outfile
 
-def generate_tmpfiles(verbose=True):
-    _, template_reg_mat = tempfile.mkstemp(suffix='.mat')
-    _, warped_mask = tempfile.mkstemp(suffix='.nii.gz')
-    if verbose:
-        print("Temporary files:\n  %s\n  %s" % (template_reg_mat, warped_mask))
-    _, template_reg = tempfile.mkstemp(suffix='.nii.gz')
-    _, warped_mask_mat = tempfile.mkstemp(suffix='.mat')
-    _, resize_mat = tempfile.mkstemp(suffix='.mat')
-    _, combined_mat = tempfile.mkstemp(suffix='.mat')
-    return template_reg, template_reg_mat, warped_mask, warped_mask_mat, resize_mat, combined_mat
+# def generate_tmpfiles(verbose=True):
+#     _, template_reg_mat = tempfile.mkstemp(suffix='.mat')
+#     _, warped_mask = tempfile.mkstemp(suffix='.nii.gz')
+#     if verbose:
+#         print("Temporary files:\n  %s\n  %s" % (template_reg_mat, warped_mask))
+#     _, template_reg = tempfile.mkstemp(suffix='.nii.gz')
+#     _, warped_mask_mat = tempfile.mkstemp(suffix='.mat')
+#     _, resize_mat = tempfile.mkstemp(suffix='.mat')
+#     _, combined_mat = tempfile.mkstemp(suffix='.mat')
+#     return template_reg, template_reg_mat, warped_mask, warped_mask_mat, resize_mat, combined_mat
 
 
 def cleanup_files(*args):
@@ -79,6 +77,28 @@ def get_outfile_type(outpath):
     else:
         raise ValueError('outfile path should be have .nii or .nii.gz suffix')
 
+def removeMask(in_file, mask, outfile):
+        from nibabel import load, Nifti1Image
+        import numpy as np
+
+        # multiply mask by infile and save
+        infile_img = load(in_file)
+        warped_mask_img = load(mask)
+
+        #invert mask
+        warped_mask_img_data = -(warped_mask_img.get_data()-1)
+
+        try:
+            outdata = infile_img.get_data().squeeze() * warped_mask_img_data
+        except ValueError:
+            tmpdata = np.stack([warped_mask_img_data] *
+                            infile_img.get_data().shape[-1], axis=-1)
+            outdata = infile_img.get_data() * tmpdata
+
+        masked_brain = Nifti1Image(outdata, infile_img.get_affine(),
+                                infile_img.get_header())
+        masked_brain.to_filename(outfile)
+
 def deface_image(infile=None, outfile=None, facemask=None,
                  template=None, cost='mutualinfo', force=False,
                  forcecleanup=False, verbose=True, **kwargs):
@@ -91,7 +111,7 @@ def deface_image(infile=None, outfile=None, facemask=None,
     outfile = output_checks(infile, outfile, force)
 
     templates = {'template': template,\
-    'facemask':facemask,
+    'facemask': facemask,\
     'inputImg' : infile}
 
     defaceWf = Workflow(name='defaceWf')
@@ -115,43 +135,21 @@ def deface_image(infile=None, outfile=None, facemask=None,
     defaceWf.connect(convertXfm,'out_file',ApplyXfmMask2Img,'in_matrix_file')
     defaceWf.connect(selectfiles,'inputImg',ApplyXfmMask2Img,'reference')
 
-    def removeMask(in_file, mask):
-
-        # multiply mask by infile and save
-        infile_img = load(in_file)
-        warped_mask_img = load(mask)
-
-        #invert mask
-        warped_mask_img_data = -(warped_mask_img.get_data()-1)
-
-        try:
-            outdata = infile_img.get_data().squeeze() * warped_mask_img_data
-        except ValueError:
-            tmpdata = np.stack([warped_mask_img_data] *
-                            infile_img.get_data().shape[-1], axis=-1)
-            outdata = infile_img.get_data() * tmpdata
-
-        masked_brain = Nifti1Image(outdata, infile_img.get_affine(),
-                                infile_img.get_header())
-        masked_brain.to_filename(outfile)
+    
 
     removeMaskNode = Node(name='removeMask',
-               interface=Function(input_names=['in_file', 'mask'],
+               interface=Function(input_names=['in_file', 'mask', 'outfile'],
                                   output_names=[],
                                   function=removeMask))
+    removeMaskNode.inputs.outfile = outfile
     defaceWf.connect(selectfiles,'inputImg',removeMaskNode,'in_file')
     defaceWf.connect(ApplyXfmMask2Img,'out_file',removeMaskNode,'mask')
+
     #datasink = Node(DataSink(),name='sink')
     #defaceWf.connect([(selectfiles,'facemask',ApplyXfmMask2Img,'in_file'),\
-
-    #template_reg, template_reg_mat, warped_mask, warped_mask_mat, resize_mat, combined_mat = generate_tmpfiles()
 
     print('Defacing...\n  %s' % infile)
     defaceWf.run()
 
     print("Defaced image saved as:\n  %s" % outfile)
-    #if forcecleanup:
-    #     cleanup_files(warped_mask, template_reg, template_reg_mat)
-    #     return warped_mask_img
-    # else:
-    #     return warped_mask_img, warped_mask, template_reg, template_reg_mat
+
