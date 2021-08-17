@@ -103,8 +103,8 @@ def main():
     welcome_decor = '-' * len(welcome_str)
     print(welcome_decor + '\n' + welcome_str + '\n' + welcome_decor)
 
-    warped_mask_img, warped_mask, template_reg, template_reg_mat =\
-        pdu.deface_image(**vars(args))
+    #warped_mask_img, warped_mask, template_reg, template_reg_mat =\
+    pdu.deface_image(**vars(args))
 
     # apply mask to other given images
     if args.applyto is not None:
