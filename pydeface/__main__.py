@@ -40,6 +40,9 @@ def setup_exceptionhook():
 def main():
     """Command line call argument parsing."""
     parser = argparse.ArgumentParser()
+    parser.add_argument('--version', action='version',
+                        help='Display verison.', version=require('pydeface')[0].version)
+    
     parser.add_argument(
         'infile', metavar='path',
         help="Path to input nifti.")
@@ -83,13 +86,22 @@ def main():
                         help='Do not catch exceptions and show exception '
                         'traceback (Drop into pdb debugger).')
 
+    if len(sys.argv) == 1:
+        parser.print_help()
+        return 0
+
+    try:
+        args = parser.parse_args()
+    except argparse.ArgumentError:
+            parser.print_usage()
+            exit(-1)
+
+    if args.debug:
+        setup_exceptionhook()
+
     welcome_str = 'pydeface ' + require("pydeface")[0].version
     welcome_decor = '-' * len(welcome_str)
     print(welcome_decor + '\n' + welcome_str + '\n' + welcome_decor)
-
-    args = parser.parse_args()
-    if args.debug:
-        setup_exceptionhook()
 
     warped_mask_img, warped_mask, template_reg, template_reg_mat =\
         pdu.deface_image(**vars(args))
@@ -123,4 +135,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

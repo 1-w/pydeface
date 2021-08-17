@@ -6,9 +6,13 @@ import sys
 from pkg_resources import resource_filename, Requirement
 import tempfile
 import numpy as np
-from nipype.interfaces import fsl
+import nipype.interfaces.fsl as fsl
 from nibabel import load, Nifti1Image
+from pathlib import Path
 
+from nipype import Workflow, Node, MapNode
+from nipype.interfaces.io import SelectFiles, DataSink
+from nipype.interfaces.utility import Function
 
 def initial_checks(template=None, facemask=None):
     """Initial sanity checks."""
@@ -47,7 +51,6 @@ def output_checks(infile, outfile=None, force=False):
         pass
     return outfile
 
-
 def generate_tmpfiles(verbose=True):
     _, template_reg_mat = tempfile.mkstemp(suffix='.mat')
     _, warped_mask = tempfile.mkstemp(suffix='.nii.gz')
@@ -76,7 +79,6 @@ def get_outfile_type(outpath):
     else:
         raise ValueError('outfile path should be have .nii or .nii.gz suffix')
 
-
 def deface_image(infile=None, outfile=None, facemask=None,
                  template=None, cost='mutualinfo', force=False,
                  forcecleanup=False, verbose=True, **kwargs):
@@ -87,72 +89,69 @@ def deface_image(infile=None, outfile=None, facemask=None,
 
     template, facemask = initial_checks(template, facemask)
     outfile = output_checks(infile, outfile, force)
-    template_reg, template_reg_mat, warped_mask, warped_mask_mat, resize_mat, combined_mat = generate_tmpfiles()
+
+    templates = {'template': template,\
+    'facemask':facemask,
+    'inputImg' : infile}
+
+    defaceWf = Workflow(name='defaceWf')
+
+    selectfiles = Node(SelectFiles(templates),name="selectfiles")
+
+    flirtT2Img = Node(fsl.FLIRT(cost_func = cost,dof = 12),name='flirtT2T1')
+    defaceWf.connect(selectfiles,'inputImg',flirtT2Img,'reference')
+    defaceWf.connect(selectfiles,'template',flirtT2Img,'in_file')
+
+    ApplyXfmRef2Mask = Node(fsl.preprocess.ApplyXFM(uses_qform=True, no_search=True, apply_xfm=True),name="ApplyXfmRef2Mask")
+    defaceWf.connect(selectfiles,'facemask',ApplyXfmRef2Mask,'in_file')
+    defaceWf.connect(selectfiles,'template',ApplyXfmRef2Mask,'reference')
+
+    convertXfm = Node(fsl.ConvertXFM(concat_xfm=True),name='convertXfm')
+    defaceWf.connect(ApplyXfmRef2Mask,'out_matrix_file',convertXfm,'in_file')
+    defaceWf.connect(flirtT2Img,'out_matrix_file',convertXfm,'in_file2')
+    
+    ApplyXfmMask2Img = Node(fsl.preprocess.ApplyXFM(apply_xfm=True),name="ApplyXfmMask2Img")
+    defaceWf.connect(selectfiles,'facemask',ApplyXfmMask2Img,'in_file')
+    defaceWf.connect(convertXfm,'out_file',ApplyXfmMask2Img,'in_matrix_file')
+    defaceWf.connect(selectfiles,'inputImg',ApplyXfmMask2Img,'reference')
+
+    def removeMask(in_file, mask):
+
+        # multiply mask by infile and save
+        infile_img = load(in_file)
+        warped_mask_img = load(mask)
+
+        #invert mask
+        warped_mask_img_data = -(warped_mask_img.get_data()-1)
+
+        try:
+            outdata = infile_img.get_data().squeeze() * warped_mask_img_data
+        except ValueError:
+            tmpdata = np.stack([warped_mask_img_data] *
+                            infile_img.get_data().shape[-1], axis=-1)
+            outdata = infile_img.get_data() * tmpdata
+
+        masked_brain = Nifti1Image(outdata, infile_img.get_affine(),
+                                infile_img.get_header())
+        masked_brain.to_filename(outfile)
+
+    removeMaskNode = Node(name='removeMask',
+               interface=Function(input_names=['in_file', 'mask'],
+                                  output_names=[],
+                                  function=removeMask))
+    defaceWf.connect(selectfiles,'inputImg',removeMaskNode,'in_file')
+    defaceWf.connect(ApplyXfmMask2Img,'out_file',removeMaskNode,'mask')
+    #datasink = Node(DataSink(),name='sink')
+    #defaceWf.connect([(selectfiles,'facemask',ApplyXfmMask2Img,'in_file'),\
+
+    #template_reg, template_reg_mat, warped_mask, warped_mask_mat, resize_mat, combined_mat = generate_tmpfiles()
 
     print('Defacing...\n  %s' % infile)
-    # register template to infile
-    outfile_type = get_outfile_type(template_reg)
-    flirt = fsl.FLIRT()
-    flirt.inputs.cost_func = cost
-    flirt.inputs.dof = 12
-    flirt.inputs.in_file = template
-    flirt.inputs.out_matrix_file = template_reg_mat
-    flirt.inputs.out_file = template_reg
-    flirt.inputs.output_type = outfile_type
-    flirt.inputs.reference = infile
-    flirt.run()
+    defaceWf.run()
 
-
-    # find resize transformation between template and facemask
-    flirt = fsl.FLIRT()
-    flirt.inputs.in_file = facemask
-    flirt.inputs.apply_xfm = True
-    flirt.inputs.uses_qform = True
-    flirt.inputs.no_search = True
-    flirt.inputs.reference = template
-    flirt.inputs.out_matrix_file = resize_mat
-    flirt.run()
-
-    # combine mats
-    convert_xfm = fsl.ConvertXFM()
-    convert_xfm.inputs.in_file = resize_mat
-    convert_xfm.inputs.concat_xfm =True
-    convert_xfm.inputs.in_file2 = template_reg_mat
-    convert_xfm.inputs.out_file = combined_mat
-    convert_xfm.run()
-
-    outfile_type = get_outfile_type(warped_mask)
-    # warp facemask to infile
-    flirt = fsl.FLIRT()
-    flirt.inputs.in_file = facemask
-    flirt.inputs.in_matrix_file = combined_mat
-    flirt.inputs.apply_xfm = True
-    flirt.inputs.reference = infile
-    flirt.inputs.out_file = warped_mask
-    flirt.inputs.output_type = outfile_type
-    flirt.inputs.out_matrix_file = warped_mask_mat
-    flirt.run()
-
-    # multiply mask by infile and save
-    infile_img = load(infile)
-    warped_mask_img = load(warped_mask)
-
-    #invert mask
-    warped_mask_img_data = -(warped_mask_img.get_data()-1)
-
-    try:
-        outdata = infile_img.get_data().squeeze() * warped_mask_img_data
-    except ValueError:
-        tmpdata = np.stack([warped_mask_img_data] *
-                           infile_img.get_data().shape[-1], axis=-1)
-        outdata = infile_img.get_data() * tmpdata
-
-    masked_brain = Nifti1Image(outdata, infile_img.get_affine(),
-                               infile_img.get_header())
-    masked_brain.to_filename(outfile)
     print("Defaced image saved as:\n  %s" % outfile)
-    if forcecleanup:
-        cleanup_files(warped_mask, template_reg, template_reg_mat)
-        return warped_mask_img
-    else:
-        return warped_mask_img, warped_mask, template_reg, template_reg_mat
+    #if forcecleanup:
+    #     cleanup_files(warped_mask, template_reg, template_reg_mat)
+    #     return warped_mask_img
+    # else:
+    #     return warped_mask_img, warped_mask, template_reg, template_reg_mat
