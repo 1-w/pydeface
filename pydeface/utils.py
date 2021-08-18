@@ -97,6 +97,8 @@ def removeMask(in_file, mask, outfile):
 
         masked_brain = Nifti1Image(outdata, infile_img.get_affine(),
                                 infile_img.get_header())
+        if outfile.endswith("nii"):
+            outfile += ".gz"
         masked_brain.to_filename(outfile)
 
 def deface_image(infile=None, outfile=None, facemask=None,
