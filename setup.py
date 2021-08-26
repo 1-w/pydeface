@@ -18,7 +18,7 @@ twine upload dist/*
 import os
 from setuptools import setup
 
-VERSION = '3.1.0'
+VERSION = '3.1.1'
 
 # read the contents of README.md
 this_directory = os.path.abspath(os.path.dirname(__file__))
@@ -50,7 +50,7 @@ setup(name='pydeface',
                    'Operating System :: POSIX',
                    'Operating System :: Unix',
                    'Operating System :: MacOS'],
-      install_requires=['numpy', 'nibabel', 'nipype'],
+      install_requires=['numpy', 'nibabel', 'nipype', 'pillow'],
       entry_points={
             'console_scripts': [
                 'pydeface = pydeface.__main__:main'

@@ -3,6 +3,7 @@
 import os
 import shutil
 import sys
+from numpy.core.numeric import _outer_dispatcher
 from pkg_resources import resource_filename, Requirement
 import tempfile
 import nipype.interfaces.fsl as fsl
@@ -77,6 +78,29 @@ def get_outfile_type(outpath):
     else:
         raise ValueError('outfile path should be have .nii or .nii.gz suffix')
 
+def save_img(in_file,target_dir=''):
+    from nibabel import load, Nifti1Image
+    import numpy as np
+    from PIL import Image
+    import os
+
+    infile_img = load(in_file).get_fdata()
+
+    shape = infile_img.shape
+
+    mid = int(shape[0]/2)
+
+    img = Image.fromarray(infile_img[mid,:,:])
+    img = img.convert("L")
+
+    if target_dir == '':
+        target_dir = os.path.join(os.path.split(in_file)[0],'control_images')
+
+    os.makedirs(target_dir,exist_ok=True)
+    outfiledir = target_dir
+    outfilename = os.path.basename(in_file).split('.')[0] + '_control.png'
+    img.save(os.path.join(outfiledir,outfilename))
+
 def removeMask(in_file, mask, outfile):
         from nibabel import load, Nifti1Image
         import numpy as np
@@ -100,10 +124,11 @@ def removeMask(in_file, mask, outfile):
         if outfile.endswith("nii"):
             outfile += ".gz"
         masked_brain.to_filename(outfile)
+        return outfile
 
 def deface_image(infile=None, outfile=None, facemask=None,
                  template=None, cost='mutualinfo', force=False,
-                 forcecleanup=False, verbose=True, **kwargs):
+                 forcecleanup=False, verbose=True, cwd=None, **kwargs):
     if not infile:
         raise ValueError("infile must be specified")
     if shutil.which('fsl') is None:
@@ -117,8 +142,19 @@ def deface_image(infile=None, outfile=None, facemask=None,
     'inputImg' : infile}
 
     defaceWf = Workflow(name='defaceWf')
+    if cwd is not None:
+        defaceWf.base_dir = cwd
+        print('set cwd to',defaceWf.base_dir)
+        print(os.path.normpath(os.path.join(cwd,outfile)))
+
+    if not os.path.isabs(infile):
+        infile = os.path.normpath(os.path.join(cwd, infile))
+
+    if not os.path.isabs(outfile):
+        outfile = os.path.normpath(os.path.join(cwd, outfile))
 
     selectfiles = Node(SelectFiles(templates),name="selectfiles")
+    selectfiles.inputs.base_directory = defaceWf.base_dir
 
     flirtT2Img = Node(fsl.FLIRT(cost_func = cost,dof = 12),name='flirtT2T1')
     defaceWf.connect(selectfiles,'inputImg',flirtT2Img,'reference')
@@ -141,11 +177,17 @@ def deface_image(infile=None, outfile=None, facemask=None,
 
     removeMaskNode = Node(name='removeMask',
                interface=Function(input_names=['in_file', 'mask', 'outfile'],
-                                  output_names=[],
+                                  output_names=['out_file'],
                                   function=removeMask))
     removeMaskNode.inputs.outfile = outfile
     defaceWf.connect(selectfiles,'inputImg',removeMaskNode,'in_file')
     defaceWf.connect(ApplyXfmMask2Img,'out_file',removeMaskNode,'mask')
+
+    saveControlImgNode = Node(name='saveControlImg',
+               interface=Function(input_names=['in_file', 'target_dir'],
+                                  output_names=[],
+                                  function=save_img))
+    defaceWf.connect(removeMaskNode,'out_file',saveControlImgNode,'in_file')
 
     #datasink = Node(DataSink(),name='sink')
     #defaceWf.connect([(selectfiles,'facemask',ApplyXfmMask2Img,'in_file'),\

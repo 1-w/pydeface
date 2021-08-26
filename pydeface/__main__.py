@@ -8,6 +8,7 @@ import pydeface.utils as pdu
 import sys
 import shutil
 import numpy as np
+import os
 
 
 def is_interactive():
@@ -102,6 +103,9 @@ def main():
     welcome_str = 'pydeface ' + require("pydeface")[0].version
     welcome_decor = '-' * len(welcome_str)
     print(welcome_decor + '\n' + welcome_str + '\n' + welcome_decor)
+
+    args.cwd = os.getcwd()
+    print('cwd is',args.cwd)
 
     #warped_mask_img, warped_mask, template_reg, template_reg_mat =\
     pdu.deface_image(**vars(args))
