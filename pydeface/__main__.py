@@ -104,11 +104,11 @@ def main():
     welcome_decor = '-' * len(welcome_str)
     print(welcome_decor + '\n' + welcome_str + '\n' + welcome_decor)
 
-    args.cwd = os.getcwd()
-    print('cwd is',args.cwd)
+    args.currentDir = os.getcwd()
+    print('currentDir is',args.currentDir)
 
     #warped_mask_img, warped_mask, template_reg, template_reg_mat =\
-    pdu.deface_image(**vars(args))
+    pdu.deface_image(**vars(args), )
 
     # apply mask to other given images
     if args.applyto is not None:

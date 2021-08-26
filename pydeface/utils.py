@@ -128,7 +128,7 @@ def removeMask(in_file, mask, outfile):
 
 def deface_image(infile=None, outfile=None, facemask=None,
                  template=None, cost='mutualinfo', force=False,
-                 forcecleanup=False, verbose=True, cwd=None, **kwargs):
+                 forcecleanup=False, verbose=True, currentDir=None, **kwargs):
     if not infile:
         raise ValueError("infile must be specified")
     if shutil.which('fsl') is None:
@@ -142,19 +142,19 @@ def deface_image(infile=None, outfile=None, facemask=None,
     'inputImg' : infile}
 
     defaceWf = Workflow(name='defaceWf')
-    if cwd is not None:
-        defaceWf.base_dir = cwd
-        print('set cwd to',defaceWf.base_dir)
-        print(os.path.normpath(os.path.join(cwd,outfile)))
+    if currentDir is not None:
+        #defaceWf.base_dir = currentDir
+        print('set currentDir to',currentDir)
+        print(os.path.normpath(os.path.join(currentDir,outfile)))
 
     if not os.path.isabs(infile):
-        infile = os.path.normpath(os.path.join(cwd, infile))
+        infile = os.path.normpath(os.path.join(currentDir, infile))
 
     if not os.path.isabs(outfile):
-        outfile = os.path.normpath(os.path.join(cwd, outfile))
+        outfile = os.path.normpath(os.path.join(currentDir, outfile))
 
     selectfiles = Node(SelectFiles(templates),name="selectfiles")
-    selectfiles.inputs.base_directory = defaceWf.base_dir
+    selectfiles.inputs.base_directory = currentDir
 
     flirtT2Img = Node(fsl.FLIRT(cost_func = cost,dof = 12),name='flirtT2T1')
     defaceWf.connect(selectfiles,'inputImg',flirtT2Img,'reference')
@@ -187,6 +187,7 @@ def deface_image(infile=None, outfile=None, facemask=None,
                interface=Function(input_names=['in_file', 'target_dir'],
                                   output_names=[],
                                   function=save_img))
+    saveControlImgNode.inputs.target_dir = os.path.join(currentDir, 'control_imgs')
     defaceWf.connect(removeMaskNode,'out_file',saveControlImgNode,'in_file')
 
     #datasink = Node(DataSink(),name='sink')
