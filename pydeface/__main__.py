@@ -104,7 +104,7 @@ def main():
     welcome_decor = '-' * len(welcome_str)
     print(welcome_decor + '\n' + welcome_str + '\n' + welcome_decor)
 
-    args.controlDir = os.getcwd()
+    args.controlDir = os.path.join(os.getcwd(),'control_imgs')
     print('currentDir is',args.controlDir)
 
     #warped_mask_img, warped_mask, template_reg, template_reg_mat =\

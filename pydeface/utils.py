@@ -82,23 +82,11 @@ def removeMask(in_file, mask, outfile,controlDir=''):
         from nibabel import load, Nifti1Image
         import numpy as np
         import os
+        from PIL import Image
 
-        def save_img(img, target_dir=''):
-            from PIL import Image
-            
-            infile_img = img.get_fdata()
+        # def save_img(img, target_dir=''):
+        # from PIL import Image
 
-            shape = infile_img.shape
-
-            mid = int(shape[0]/2)
-
-            img = Image.fromarray(infile_img[mid,:,:])
-            img = img.convert("L")
-
-            os.makedirs(target_dir,exist_ok=True)
-            outfiledir = target_dir
-            outfilename = os.path.basename(in_file).split('.')[0] + '_control.png'
-            img.save(os.path.join(outfiledir,outfilename))
 
         # multiply mask by infile and save
         infile_img = load(in_file)
@@ -123,7 +111,19 @@ def removeMask(in_file, mask, outfile,controlDir=''):
         if controlDir == '':
             controlDir = os.path.join(os.path.split(in_file)[0],'control_images')
 
-        save_img(masked_brain,controlDir)
+        infile_img = outdata
+        shape = infile_img.shape
+
+        mid = int(shape[0]/2)
+
+        img = Image.fromarray(infile_img[mid,:,:])
+        img = img.convert("L")
+
+        os.makedirs(controlDir,exist_ok=True)
+        outfiledir = controlDir
+        outfilename = os.path.basename(in_file).split('.')[0] + '_control.png'
+        img.save(os.path.join(outfiledir,outfilename))
+        # save_img(masked_brain,controlDir)
         
 
 
@@ -131,7 +131,7 @@ def removeMask(in_file, mask, outfile,controlDir=''):
 
 def deface_image(infile=None, outfile=None, facemask=None,
                  template=None, cost='mutualinfo', force=False,
-                 forcecleanup=False, verbose=True, controlDir=None, **kwargs):
+                 forcecleanup=False, verbose=True, controlDir='', **kwargs):
     if not infile:
         raise ValueError("infile must be specified")
     if shutil.which('fsl') is None:
@@ -176,10 +176,11 @@ def deface_image(infile=None, outfile=None, facemask=None,
     defaceWf.connect(selectfiles,'inputImg',ApplyXfmMask2Img,'reference')
 
     removeMaskNode = Node(name='removeMask',
-               interface=Function(input_names=['in_file', 'mask', 'outfile'],
+               interface=Function(input_names=['in_file', 'mask', 'outfile','controlDir'],
                                   output_names=[''],
                                   function=removeMask))
     removeMaskNode.inputs.outfile = outfile
+    removeMaskNode.inputs.controlDir = controlDir
     defaceWf.connect(selectfiles,'inputImg',removeMaskNode,'in_file')
     defaceWf.connect(ApplyXfmMask2Img,'out_file',removeMaskNode,'mask')
 
