@@ -104,8 +104,8 @@ def main():
     welcome_decor = '-' * len(welcome_str)
     print(welcome_decor + '\n' + welcome_str + '\n' + welcome_decor)
 
-    args.currentDir = os.getcwd()
-    print('currentDir is',args.currentDir)
+    args.controlDir = os.getcwd()
+    print('currentDir is',args.controlDir)
 
     #warped_mask_img, warped_mask, template_reg, template_reg_mat =\
     pdu.deface_image(**vars(args), )
