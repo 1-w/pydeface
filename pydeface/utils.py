@@ -78,30 +78,27 @@ def get_outfile_type(outpath):
     else:
         raise ValueError('outfile path should be have .nii or .nii.gz suffix')
 
-def save_img(img, target_dir=''):
-    from nibabel import load, Nifti1Image
-    import numpy as np
-    from PIL import Image
-    import os
-
-    infile_img = img.get_fdata()
-
-    shape = infile_img.shape
-
-    mid = int(shape[0]/2)
-
-    img = Image.fromarray(infile_img[mid,:,:])
-    img = img.convert("L")
-
-    os.makedirs(target_dir,exist_ok=True)
-    outfiledir = target_dir
-    outfilename = os.path.basename(in_file).split('.')[0] + '_control.png'
-    img.save(os.path.join(outfiledir,outfilename))
-
 def removeMask(in_file, mask, outfile,controlDir=''):
         from nibabel import load, Nifti1Image
         import numpy as np
         import os
+
+        def save_img(img, target_dir=''):
+            from PIL import Image
+            
+            infile_img = img.get_fdata()
+
+            shape = infile_img.shape
+
+            mid = int(shape[0]/2)
+
+            img = Image.fromarray(infile_img[mid,:,:])
+            img = img.convert("L")
+
+            os.makedirs(target_dir,exist_ok=True)
+            outfiledir = target_dir
+            outfilename = os.path.basename(in_file).split('.')[0] + '_control.png'
+            img.save(os.path.join(outfiledir,outfilename))
 
         # multiply mask by infile and save
         infile_img = load(in_file)
