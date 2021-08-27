@@ -101,6 +101,7 @@ def save_img(img, target_dir=''):
 def removeMask(in_file, mask, outfile,controlDir=''):
         from nibabel import load, Nifti1Image
         import numpy as np
+        import os
 
         # multiply mask by infile and save
         infile_img = load(in_file)
