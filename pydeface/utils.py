@@ -20,7 +20,7 @@ def initial_checks(template=None, facemask=None):
                                      "pydeface/data/mni_icbm152_t1_tal_nlin_asym_09a.nii.gz")
     if facemask is None:
         facemask = resource_filename(Requirement.parse("pydeface"),
-                                     "pydeface/data/mni_icbm152_t1_tal_nlin_asym_09a_face_mask_filled_resampled_resized.nii.gz")
+                                     "pydeface/data/mni_icbm152_t1_tal_nlin_asym_09a_face_mask_filled_resampled_resized_v2.nii.gz")
 
     if not os.path.exists(template):
         raise Exception('Missing template: %s' % template)
