@@ -29,7 +29,7 @@ if os.path.exists('MANIFEST'):
     os.remove('MANIFEST')
 
 datafiles = {'pydeface': ['data/mni_icbm152_t1_tal_nlin_asym_09a.nii.gz',
-                          'data/mni_icbm152_t1_tal_nlin_asym_09a_face_mask_filled_resampled_resized_v2.nii.gz']}
+                          'data/mni_icbm152_t1_tal_nlin_asym_09a_face_mask_filled_resampled_resized_v3.nii.gz']}
 
 setup(name='pydeface',
       maintainer='Russ Poldrack',
