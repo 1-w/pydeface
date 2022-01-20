@@ -115,8 +115,13 @@ def removeMask(in_file, mask, outfile,controlDir=''):
         shape = infile_img.shape
 
         mid = int(shape[0]/2)
+        img_ar = infile_img[mid,:,:]
+        #normalize
+        img_ar -= img_ar.min()
+        img_ar /= img_ar.max()
+        img_ar *= 255
 
-        img = Image.fromarray(infile_img[mid,:,:])
+        img = Image.fromarray(img_ar)
         img = img.convert("L")
 
         os.makedirs(controlDir,exist_ok=True)
